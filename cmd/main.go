@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -23,6 +24,14 @@ type Response struct {
 	Protocol   string
 	Headers    map[string]string
 	Body       []byte
+}
+
+type HandlerFunc func(*Request) (*Response, error)
+
+type Router map[string]HandlerFunc
+
+var ServerRouter = Router{
+	`^\/$`: RootHandler,
 }
 
 func main() {
@@ -55,7 +64,6 @@ func handleConnection(conn net.Conn) {
 
 	request, err = parseRequest(bufio.NewReader(conn))
 	if err != nil {
-		fmt.Println("failed to parse request:", err)
 		response = &Response{
 			StatusCode: 400,
 			StatusText: "Bad Request",
@@ -67,6 +75,8 @@ func handleConnection(conn net.Conn) {
 			Body: []byte{},
 		}
 		conn.Write(marshalResponse(response))
+		fmt.Println("failed to parse request:", err)
+		fmt.Println("response: ", response.StatusCode, response.StatusText)
 		return
 	}
 
@@ -85,22 +95,47 @@ func handleConnection(conn net.Conn) {
 			Body: []byte{},
 		}
 		conn.Write(marshalResponse(response))
+		fmt.Println("unsupported method:", request.Method)
+		fmt.Println("response: ", response.StatusCode, response.StatusText)
 		return
 	}
 
-	body := []byte("Hello, World!")
-	response = &Response{
-		StatusCode: 200,
-		StatusText: "OK",
-		Protocol:   "HTTP/1.1",
-		Headers: map[string]string{
-			"Content-Type":   "text/plain",
-			"Content-Length": strconv.Itoa(len(body)),
-		},
-		Body: body,
+	handler, found := matchRoute(request.Path)
+	if !found {
+		response = &Response{
+			StatusCode: 404,
+			StatusText: "Not Found",
+			Protocol:   "HTTP/1.1",
+			Headers: map[string]string{
+				"Content-Type":   "text/plain",
+				"Content-Length": "0",
+			},
+			Body: []byte{},
+		}
+		conn.Write(marshalResponse(response))
+		fmt.Println("no handler found for path: ", request.Path)
+		fmt.Println("response: ", response.StatusCode, response.StatusText)
+		return
+	}
+
+	response, err = handler(request)
+	if err != nil {
+		response = &Response{
+			StatusCode: 500,
+			StatusText: "Internal Server Error",
+			Protocol:   "HTTP/1.1",
+			Headers: map[string]string{
+				"Content-Type":   "text/plain",
+				"Content-Length": "0",
+			},
+			Body: []byte{},
+		}
+		conn.Write(marshalResponse(response))
+		fmt.Println("failed to handle request:", err)
+		return
 	}
 	conn.Write(marshalResponse(response))
-	fmt.Println("sent response:", response.StatusCode, response.StatusText)
+	fmt.Println("sent response: ", response.StatusCode, response.StatusText)
 }
 
 func parseRequest(reader *bufio.Reader) (*Request, error) {
@@ -169,4 +204,38 @@ func marshalResponse(response *Response) []byte {
 	sb.WriteString("\r\n")
 	sb.Write(response.Body)
 	return []byte(sb.String())
+}
+
+func matchRoute(path string) (HandlerFunc, bool) {
+	if handler, ok := ServerRouter[path]; ok {
+		return handler, true
+	}
+
+	for pattern, handler := range ServerRouter {
+		if pattern == path {
+			continue
+		}
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			continue
+		}
+		if re.MatchString(path) {
+			return handler, true
+		}
+	}
+	return nil, false
+}
+
+func RootHandler(request *Request) (*Response, error) {
+	body := []byte("Hello, World!")
+	return &Response{
+		StatusCode: 200,
+		StatusText: "OK",
+		Protocol:   "HTTP/1.1",
+		Headers: map[string]string{
+			"Content-Type":   "text/plain",
+			"Content-Length": strconv.Itoa(len(body)),
+		},
+		Body: body,
+	}, nil
 }
