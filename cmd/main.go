@@ -81,13 +81,7 @@ func handleConnection(conn net.Conn) {
 
 	request, err = parseRequest(bufio.NewReader(conn))
 	if err != nil {
-		response = &Response{
-			StatusCode: 400,
-			StatusText: "Bad Request",
-			Protocol:   "HTTP/1.1",
-			Headers:    DefaultHeaders,
-			Body:       []byte{},
-		}
+		response, _ = http400BadRequest()
 		conn.Write(marshalResponse(response))
 		fmt.Println("failed to parse request:", err)
 		fmt.Println("response: ", response.StatusCode, response.StatusText)
@@ -97,13 +91,7 @@ func handleConnection(conn net.Conn) {
 	fmt.Println("parsed request:", request.Method, request.Path, request.Protocol)
 
 	if request.Method != "GET" {
-		response = &Response{
-			StatusCode: 405,
-			StatusText: "Method Not Allowed",
-			Protocol:   "HTTP/1.1",
-			Headers:    DefaultHeaders,
-			Body:       []byte{},
-		}
+		response, _ = http405MethodNotAllowed()
 		conn.Write(marshalResponse(response))
 		fmt.Println("unsupported method:", request.Method)
 		fmt.Println("response: ", response.StatusCode, response.StatusText)
@@ -112,13 +100,7 @@ func handleConnection(conn net.Conn) {
 
 	handler, found := matchRoute(request.Path)
 	if !found {
-		response = &Response{
-			StatusCode: 404,
-			StatusText: "Not Found",
-			Protocol:   "HTTP/1.1",
-			Headers:    DefaultHeaders,
-			Body:       []byte{},
-		}
+		response, _ = http404NotFound()
 		conn.Write(marshalResponse(response))
 		fmt.Println("no handler found for path: ", request.Path)
 		fmt.Println("response: ", response.StatusCode, response.StatusText)
@@ -132,13 +114,7 @@ func handleConnection(conn net.Conn) {
 
 	response, err = handlerPipeline(request)
 	if err != nil {
-		response = &Response{
-			StatusCode: 500,
-			StatusText: "Internal Server Error",
-			Protocol:   "HTTP/1.1",
-			Headers:    DefaultHeaders,
-			Body:       []byte{},
-		}
+		response, _ = http500InternalServerError()
 		conn.Write(marshalResponse(response))
 		fmt.Println("failed to handle request:", err)
 		return
@@ -147,16 +123,58 @@ func handleConnection(conn net.Conn) {
 	fmt.Println("sent response: ", response.StatusCode, response.StatusText)
 }
 
+func http400BadRequest() (*Response, any) {
+	return &Response{
+		StatusCode: 400,
+		StatusText: "Bad Request",
+		Protocol:   "HTTP/1.1",
+		Headers:    DefaultHeaders,
+		Body:       []byte("Bad Request"),
+	}, nil
+}
+
+func http404NotFound() (*Response, any) {
+	return &Response{
+		StatusCode: 404,
+		StatusText: "Not Found",
+		Protocol:   "HTTP/1.1",
+		Headers:    DefaultHeaders,
+		Body:       []byte("Not Found"),
+	}, nil
+}
+
+func http405MethodNotAllowed() (*Response, any) {
+	return &Response{
+		StatusCode: 405,
+		StatusText: "Method Not Allowed",
+		Protocol:   "HTTP/1.1",
+		Headers:    DefaultHeaders,
+		Body:       []byte("Method Not Allowed"),
+	}, nil
+}
+
+func http500InternalServerError() (*Response, any) {
+	return &Response{
+		StatusCode: 500,
+		StatusText: "Internal Server Error",
+		Protocol:   "HTTP/1.1",
+		Headers:    DefaultHeaders,
+		Body:       []byte("Internal Server Error"),
+	}, nil
+}
+
 func parseRequest(reader *bufio.Reader) (*Request, error) {
 	startLine, err := reader.ReadString('\n')
 	if err != nil {
 		return nil, fmt.Errorf("failed to read request: %s", err.Error())
 	}
+
 	var request Request
 	total, err := fmt.Sscanf(startLine, "%s %s %s", &request.Method, &request.Path, &request.Protocol)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse request line: %s", err.Error())
 	}
+
 	if total != 3 {
 		return nil, fmt.Errorf("invalid request start line: %s", startLine)
 	}
@@ -249,18 +267,7 @@ func baseMiddleware(next HandlerFunc) HandlerFunc {
 		if err != nil {
 			return nil, err
 		}
-
-		if response.Headers == nil {
-			response.Headers = make(map[string]string)
-		}
-
-		for key, value := range DefaultHeaders {
-			if _, ok := response.Headers[key]; !ok {
-				response.Headers[key] = value
-			}
-		}
-		response.Protocol = "HTTP/1.1"
-		response.Headers["Content-Length"] = strconv.Itoa(len(response.Body))
+		addDefaultHeaders(response)
 		return response, nil
 	}
 }
@@ -295,4 +302,17 @@ func gzipMiddleware(next HandlerFunc) HandlerFunc {
 		response.Headers["Content-Length"] = strconv.Itoa(len(response.Body))
 		return response, nil
 	}
+}
+
+func addDefaultHeaders(response *Response) {
+	if response.Headers == nil {
+		response.Headers = make(map[string]string)
+	}
+	for key, value := range DefaultHeaders {
+		if _, ok := response.Headers[key]; !ok {
+			response.Headers[key] = value
+		}
+	}
+	response.Protocol = "HTTP/1.1"
+	response.Headers["Content-Length"] = strconv.Itoa(len(response.Body))
 }
