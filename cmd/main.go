@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"net"
@@ -39,8 +41,9 @@ type Middleware func(next HandlerFunc) HandlerFunc
 
 type Router map[string]HandlerFunc
 
-var DefaultMiddlewares = []Middleware{
+var ResponseMiddlewares = []Middleware{
 	baseMiddleware,
+	gzipMiddleware,
 }
 
 var ServerRouter = Router{
@@ -123,7 +126,7 @@ func handleConnection(conn net.Conn) {
 	}
 
 	handlerPipeline := handler
-	for _, middleware := range DefaultMiddlewares {
+	for _, middleware := range ResponseMiddlewares {
 		handlerPipeline = middleware(handlerPipeline)
 	}
 
@@ -256,9 +259,40 @@ func baseMiddleware(next HandlerFunc) HandlerFunc {
 				response.Headers[key] = value
 			}
 		}
-
-		response.Headers["Content-Length"] = strconv.Itoa(len(response.Body))
 		response.Protocol = "HTTP/1.1"
+		response.Headers["Content-Length"] = strconv.Itoa(len(response.Body))
+		return response, nil
+	}
+}
+
+func gzipMiddleware(next HandlerFunc) HandlerFunc {
+	return func(request *Request) (*Response, error) {
+		acceptEncoding := request.Headers["Accept-Encoding"]
+		if !strings.Contains(acceptEncoding, "gzip") {
+			return next(request)
+		}
+
+		response, err := next(request)
+		if err != nil {
+			return response, err
+		}
+
+		var buf bytes.Buffer
+		gz := gzip.NewWriter(&buf)
+		_, err = gz.Write(response.Body)
+		if err != nil {
+			return nil, err
+		}
+		gz.Close()
+
+		response.Body = buf.Bytes()
+
+		if response.Headers == nil {
+			response.Headers = make(map[string]string)
+		}
+
+		response.Headers["Content-Encoding"] = "gzip"
+		response.Headers["Content-Length"] = strconv.Itoa(len(response.Body))
 		return response, nil
 	}
 }
