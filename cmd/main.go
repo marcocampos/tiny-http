@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"regexp"
@@ -39,11 +40,11 @@ type Middleware func(next HandlerFunc) HandlerFunc
 type Router map[string]HandlerFunc
 
 var DefaultMiddlewares = []Middleware{
-	defaultsMiddleware,
+	baseMiddleware,
 }
 
 var ServerRouter = Router{
-	`^\/$`: RootHandler,
+	`^\/$`: rootHandler,
 }
 
 func main() {
@@ -187,7 +188,7 @@ func parseRequest(reader *bufio.Reader) (*Request, error) {
 		}
 		if cl > 0 {
 			body := make([]byte, cl)
-			_, err := reader.Read(body)
+			_, err := io.ReadFull(reader, body)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read body: %s", err.Error())
 			}
@@ -229,16 +230,27 @@ func matchRoute(path string) (HandlerFunc, bool) {
 	return nil, false
 }
 
-func RootHandler(request *Request) (*Response, error) {
+func rootHandler(request *Request) (*Response, error) {
 	body := []byte("Hello, World!")
 	return &Response{
 		StatusCode: 200,
 		StatusText: "OK",
+		Protocol:   "HTTP/1.1",
 		Body:       body,
 	}, nil
 }
 
-func defaultsMiddleware(next HandlerFunc) HandlerFunc {
+func http404Handler(request *Request) (*Response, error) {
+	body := []byte("404 Not Found")
+	return &Response{
+		StatusCode: 404,
+		StatusText: "Not Found",
+		Protocol:   "HTTP/1.1",
+		Body:       body,
+	}, nil
+}
+
+func baseMiddleware(next HandlerFunc) HandlerFunc {
 	return func(request *Request) (*Response, error) {
 		response, err := next(request)
 		if err != nil {
