@@ -1,0 +1,35 @@
+version: "3"
+
+tasks:
+  clean:
+    cmds:
+      - rm -f tiny-http || true
+
+  build:
+    cmds:
+      - |
+        go build \
+          -gcflags="all=-N -l" \
+          -ldflags="-X 'github.com/marcocampos/tiny-http/internal/server.CommitHash={{.GIT_COMMIT }}' \
+                    -X 'github.com/marcocampos/tiny-http/internal/server.Version=dev'" \
+          -o ./tiny-http ./cmd
+
+  run:
+    cmds:
+      - |
+        go run \
+          -gcflags="all=-N -l" \
+          -ldflags="-X 'github.com/marcocampos/tiny-http/internal/server.CommitHash={{.GIT_COMMIT }}' \
+          -X 'github.com/marcocampos/tiny-http/internal/server.Version=dev'" \
+          ./cmd \
+            -hostname 127.0.0.1 \
+            -port 8080 \
+            -directory \./static \
+            -log-level debug
+    vars:
+      GIT_COMMIT:
+        sh: git log -n 1 --format=%h
+
+  test:
+    cmds:
+      - go test -short ./...

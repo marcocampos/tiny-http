@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tiny HTTP Server</title>
+    <style>
+        :root {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: white;
+            --text-primary: #333;
+            --text-secondary: #666;
+            --border-color: #eee;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --code-bg: #f4f4f4;
+            --info-bg: #e3f2fd;
+            --info-text: #1976d2;
+            --link-color: #1976d2;
+            --success-color: #4CAF50;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --border-color: #404040;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --code-bg: #3a3a3a;
+            --info-bg: #1e3a5f;
+            --info-text: #64b5f6;
+            --link-color: #64b5f6;
+            --success-color: #66bb6a;
+        }
+
+        * {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .container {
+            background-color: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px var(--shadow);
+            position: relative;
+        }
+
+        .theme-toggle {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: 2px solid var(--border-color);
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--text-primary);
+            transform: scale(1.05);
+        }
+
+        .theme-toggle:active {
+            transform: scale(0.95);
+        }
+
+        h1 {
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        h2 {
+            color: var(--text-primary);
+        }
+
+        p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        a {
+            color: var(--link-color);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+
+        .feature-list li:before {
+            content: "✓ ";
+            color: var(--success-color);
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        code {
+            background-color: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
+            color: var(--text-primary);
+        }
+
+        pre {
+            background-color: var(--code-bg);
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .info {
+            background-color: var(--info-bg);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-top: 1.5rem;
+        }
+
+        .info h3 {
+            margin-top: 0;
+            color: var(--info-text);
+        }
+
+        .info p,
+        .info li {
+            color: var(--text-primary);
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 1rem;
+            }
+
+            .container {
+                padding: 1.5rem;
+            }
+
+            .theme-toggle {
+                padding: 0.4rem 0.8rem;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle Dark Mode">
+            <span class="theme-icon">🌙</span>
+            <span class="theme-text">Dark</span>
+        </button>
+
+        <h1>🚀 Tiny HTTP Server</h1>
+        <p>Welcome to the Tiny HTTP Server! This lightweight server is written in Go and designed to
+            serve static files in an easy way.</p>
+
+        <h2>Features</h2>
+        <ul class="feature-list">
+            <li>Static file serving with automatic MIME type detection</li>
+            <li>Gzip compression for supported clients</li>
+            <li>Directory index support (serves index.html automatically)</li>
+            <li>Graceful shutdown with connection draining</li>
+            <li>Structured logging with configurable levels</li>
+            <li>Security headers and path traversal protection</li>
+            <li>HTTP/1.1 keep-alive connections</li>
+            <li>Concurrent request handling</li>
+            <li>Extensible middleware system</li>
+            <li>Regex-based routing</li>
+        </ul>
+
+        <div class="info">
+            <h3>Server Information</h3>
+            <p>This page is being served by the Tiny HTTP Server. Check the response headers to see:</p>
+            <ul>
+                <li>Server: <code>tiny-http/0.1</code></li>
+                <li>Content encoding (if your browser supports gzip)</li>
+                <li>Security headers for protection</li>
+                <li>Proper caching directives</li>
+            </ul>
+        </div>
+
+        <h2>Quick Start</h2>
+        <p>To run this server:</p>
+        <pre><code>./tiny-http -directory ./static -port 8080</code></pre>
+
+        <p>For more information, check the <a href="https://github.com/marcocampos/tiny-http">GitHub repository</a>.</p>
+    </div>
+
+    <script>
+        // Theme management
+        const themeToggle = document.getElementById('themeToggle');
+        const htmlElement = document.documentElement;
+        const themeIcon = themeToggle.querySelector('.theme-icon');
+        const themeText = themeToggle.querySelector('.theme-text');
+
+        // Check for saved theme preference or default to light mode
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        htmlElement.setAttribute('data-theme', currentTheme);
+        updateThemeToggle(currentTheme);
+
+        // Toggle theme
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = htmlElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+            htmlElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeToggle(newTheme);
+        });
+
+        // Update toggle button appearance
+        function updateThemeToggle(theme) {
+            if (theme === 'dark') {
+                themeIcon.textContent = '☀️';
+                themeText.textContent = 'Light';
+            } else {
+                themeIcon.textContent = '🌙';
+                themeText.textContent = 'Dark';
+            }
+        }
+
+        // Respect system preference on first visit
+        if (!localStorage.getItem('theme')) {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (prefersDark) {
+                htmlElement.setAttribute('data-theme', 'dark');
+                updateThemeToggle('dark');
+            }
+        }
+
+        // Listen for system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            // Only apply system preference if user hasn't manually set a preference
+            if (!localStorage.getItem('theme')) {
+                const newTheme = e.matches ? 'dark' : 'light';
+                htmlElement.setAttribute('data-theme', newTheme);
+                updateThemeToggle(newTheme);
+            }
+        });
+    </script>
+</body>
+
+</html>
