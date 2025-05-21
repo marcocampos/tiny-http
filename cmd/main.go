@@ -26,9 +26,21 @@ type Response struct {
 	Body       []byte
 }
 
+var DefaultHeaders = map[string]string{
+	"Server":         "tinny-http/0.1",
+	"Content-Type":   "text/plain",
+	"Content-Length": "0",
+}
+
 type HandlerFunc func(*Request) (*Response, error)
 
+type Middleware func(next HandlerFunc) HandlerFunc
+
 type Router map[string]HandlerFunc
+
+var DefaultMiddlewares = []Middleware{
+	defaultsMiddleware,
+}
 
 var ServerRouter = Router{
 	`^\/$`: RootHandler,
@@ -60,6 +72,7 @@ func handleConnection(conn net.Conn) {
 
 	var request *Request
 	var response *Response
+	var handler HandlerFunc
 	var err error
 
 	request, err = parseRequest(bufio.NewReader(conn))
@@ -68,11 +81,8 @@ func handleConnection(conn net.Conn) {
 			StatusCode: 400,
 			StatusText: "Bad Request",
 			Protocol:   "HTTP/1.1",
-			Headers: map[string]string{
-				"Content-Type":   "text/plain",
-				"Content-Length": "0",
-			},
-			Body: []byte{},
+			Headers:    DefaultHeaders,
+			Body:       []byte{},
 		}
 		conn.Write(marshalResponse(response))
 		fmt.Println("failed to parse request:", err)
@@ -83,16 +93,12 @@ func handleConnection(conn net.Conn) {
 	fmt.Println("parsed request:", request.Method, request.Path, request.Protocol)
 
 	if request.Method != "GET" {
-		fmt.Println("unsupported method:", request.Method)
 		response = &Response{
 			StatusCode: 405,
 			StatusText: "Method Not Allowed",
 			Protocol:   "HTTP/1.1",
-			Headers: map[string]string{
-				"Content-Type":   "text/plain",
-				"Content-Length": "0",
-			},
-			Body: []byte{},
+			Headers:    DefaultHeaders,
+			Body:       []byte{},
 		}
 		conn.Write(marshalResponse(response))
 		fmt.Println("unsupported method:", request.Method)
@@ -106,11 +112,8 @@ func handleConnection(conn net.Conn) {
 			StatusCode: 404,
 			StatusText: "Not Found",
 			Protocol:   "HTTP/1.1",
-			Headers: map[string]string{
-				"Content-Type":   "text/plain",
-				"Content-Length": "0",
-			},
-			Body: []byte{},
+			Headers:    DefaultHeaders,
+			Body:       []byte{},
 		}
 		conn.Write(marshalResponse(response))
 		fmt.Println("no handler found for path: ", request.Path)
@@ -118,17 +121,19 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
-	response, err = handler(request)
+	handlerPipeline := handler
+	for _, middleware := range DefaultMiddlewares {
+		handlerPipeline = middleware(handlerPipeline)
+	}
+
+	response, err = handlerPipeline(request)
 	if err != nil {
 		response = &Response{
 			StatusCode: 500,
 			StatusText: "Internal Server Error",
 			Protocol:   "HTTP/1.1",
-			Headers: map[string]string{
-				"Content-Type":   "text/plain",
-				"Content-Length": "0",
-			},
-			Body: []byte{},
+			Headers:    DefaultHeaders,
+			Body:       []byte{},
 		}
 		conn.Write(marshalResponse(response))
 		fmt.Println("failed to handle request:", err)
@@ -151,9 +156,7 @@ func parseRequest(reader *bufio.Reader) (*Request, error) {
 	if total != 3 {
 		return nil, fmt.Errorf("invalid request start line: %s", startLine)
 	}
-	if request.Method != "GET" {
-		return nil, fmt.Errorf("unsupported method: %s", request.Method)
-	}
+
 	if request.Protocol != "HTTP/1.1" {
 		return nil, fmt.Errorf("unsupported protocol: %s", request.Protocol)
 	}
@@ -231,11 +234,29 @@ func RootHandler(request *Request) (*Response, error) {
 	return &Response{
 		StatusCode: 200,
 		StatusText: "OK",
-		Protocol:   "HTTP/1.1",
-		Headers: map[string]string{
-			"Content-Type":   "text/plain",
-			"Content-Length": strconv.Itoa(len(body)),
-		},
-		Body: body,
+		Body:       body,
 	}, nil
+}
+
+func defaultsMiddleware(next HandlerFunc) HandlerFunc {
+	return func(request *Request) (*Response, error) {
+		response, err := next(request)
+		if err != nil {
+			return nil, err
+		}
+
+		if response.Headers == nil {
+			response.Headers = make(map[string]string)
+		}
+
+		for key, value := range DefaultHeaders {
+			if _, ok := response.Headers[key]; !ok {
+				response.Headers[key] = value
+			}
+		}
+
+		response.Headers["Content-Length"] = strconv.Itoa(len(response.Body))
+		response.Protocol = "HTTP/1.1"
+		return response, nil
+	}
 }
