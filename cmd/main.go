@@ -17,6 +17,14 @@ type Request struct {
 	Body     []byte
 }
 
+type Response struct {
+	StatusCode int
+	StatusText string
+	Protocol   string
+	Headers    map[string]string
+	Body       []byte
+}
+
 func main() {
 	fmt.Println("tinny-http: a simple HTTP server")
 	listen, err := net.Listen("tcp4", ":8080")
@@ -41,32 +49,58 @@ func handleConnection(conn net.Conn) {
 	defer conn.Close()
 	fmt.Println("accepted connection from", conn.RemoteAddr())
 
-	request, err := parseRequest(bufio.NewReader(conn))
+	var request *Request
+	var response *Response
+	var err error
+
+	request, err = parseRequest(bufio.NewReader(conn))
 	if err != nil {
 		fmt.Println("failed to parse request:", err)
-		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n"))
-		conn.Write([]byte("Content-Type: text/plain\r\n"))
-		conn.Write([]byte("Content-Length: 0\r\n"))
-		conn.Write([]byte("\r\n"))
+		response = &Response{
+			StatusCode: 400,
+			StatusText: "Bad Request",
+			Protocol:   "HTTP/1.1",
+			Headers: map[string]string{
+				"Content-Type":   "text/plain",
+				"Content-Length": "0",
+			},
+			Body: []byte{},
+		}
+		conn.Write(marshalResponse(response))
 		return
 	}
 
+	fmt.Println("parsed request:", request.Method, request.Path, request.Protocol)
+
 	if request.Method != "GET" {
 		fmt.Println("unsupported method:", request.Method)
-		conn.Write([]byte("HTTP/1.1 405 Method Not Allowed\r\n"))
-		conn.Write([]byte("Content-Type: text/plain\r\n"))
-		conn.Write([]byte("Content-Length: 0\r\n"))
-		conn.Write([]byte("\r\n"))
+		response = &Response{
+			StatusCode: 405,
+			StatusText: "Method Not Allowed",
+			Protocol:   "HTTP/1.1",
+			Headers: map[string]string{
+				"Content-Type":   "text/plain",
+				"Content-Length": "0",
+			},
+			Body: []byte{},
+		}
+		conn.Write(marshalResponse(response))
 		return
 	}
 
 	body := []byte("Hello, World!")
-	conn.Write([]byte("HTTP/1.1 200 OK\r\n"))
-	conn.Write([]byte("Content-Type: text/plain\r\n"))
-	conn.Write([]byte(fmt.Sprintf("Content-Length: %d\r\n", len(body))))
-	conn.Write([]byte("\r\n"))
-	conn.Write(body)
-
+	response = &Response{
+		StatusCode: 200,
+		StatusText: "OK",
+		Protocol:   "HTTP/1.1",
+		Headers: map[string]string{
+			"Content-Type":   "text/plain",
+			"Content-Length": strconv.Itoa(len(body)),
+		},
+		Body: body,
+	}
+	conn.Write(marshalResponse(response))
+	fmt.Println("sent response:", response.StatusCode, response.StatusText)
 }
 
 func parseRequest(reader *bufio.Reader) (*Request, error) {
@@ -124,4 +158,15 @@ func parseRequest(reader *bufio.Reader) (*Request, error) {
 	}
 
 	return &request, nil
+}
+
+func marshalResponse(response *Response) []byte {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("%s %d %s\r\n", response.Protocol, response.StatusCode, response.StatusText))
+	for key, value := range response.Headers {
+		sb.WriteString(fmt.Sprintf("%s: %s\r\n", key, value))
+	}
+	sb.WriteString("\r\n")
+	sb.Write(response.Body)
+	return []byte(sb.String())
 }
