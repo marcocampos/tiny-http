@@ -30,7 +30,7 @@ type HandlerFunc func(*Request) (*Response, error)
 
 type Router map[string]HandlerFunc
 
-var GlobalRouter = Router{
+var ServerRouter = Router{
 	`^\/$`: RootHandler,
 }
 
@@ -64,7 +64,6 @@ func handleConnection(conn net.Conn) {
 
 	request, err = parseRequest(bufio.NewReader(conn))
 	if err != nil {
-		fmt.Println("failed to parse request:", err)
 		response = &Response{
 			StatusCode: 400,
 			StatusText: "Bad Request",
@@ -76,6 +75,8 @@ func handleConnection(conn net.Conn) {
 			Body: []byte{},
 		}
 		conn.Write(marshalResponse(response))
+		fmt.Println("failed to parse request:", err)
+		fmt.Println("response: ", response.StatusCode, response.StatusText)
 		return
 	}
 
@@ -95,6 +96,7 @@ func handleConnection(conn net.Conn) {
 		}
 		conn.Write(marshalResponse(response))
 		fmt.Println("unsupported method:", request.Method)
+		fmt.Println("response: ", response.StatusCode, response.StatusText)
 		return
 	}
 
@@ -112,6 +114,7 @@ func handleConnection(conn net.Conn) {
 		}
 		conn.Write(marshalResponse(response))
 		fmt.Println("no handler found for path: ", request.Path)
+		fmt.Println("response: ", response.StatusCode, response.StatusText)
 		return
 	}
 
@@ -204,11 +207,11 @@ func marshalResponse(response *Response) []byte {
 }
 
 func matchRoute(path string) (HandlerFunc, bool) {
-	if handler, ok := GlobalRouter[path]; ok {
+	if handler, ok := ServerRouter[path]; ok {
 		return handler, true
 	}
 
-	for pattern, handler := range GlobalRouter {
+	for pattern, handler := range ServerRouter {
 		if pattern == path {
 			continue
 		}
