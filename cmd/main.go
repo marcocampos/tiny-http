@@ -240,16 +240,6 @@ func rootHandler(request *Request) (*Response, error) {
 	}, nil
 }
 
-func http404Handler(request *Request) (*Response, error) {
-	body := []byte("404 Not Found")
-	return &Response{
-		StatusCode: 404,
-		StatusText: "Not Found",
-		Protocol:   "HTTP/1.1",
-		Body:       body,
-	}, nil
-}
-
 func baseMiddleware(next HandlerFunc) HandlerFunc {
 	return func(request *Request) (*Response, error) {
 		response, err := next(request)
