@@ -10,7 +10,7 @@ import (
 
 func main() {
 	directory := flag.String("directory", "", "Directory to serve files from")
-	hostname := flag.String("hostname", "localhost", "Hostname or IP address to bind to")
+	hostname := flag.String("hostname", "0.0.0.0", "Hostname or IP address to bind to")
 	port := flag.String("port", "8080", "Port to listen on")
 	flag.Parse()
 

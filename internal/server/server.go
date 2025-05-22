@@ -126,7 +126,7 @@ func (s *HttpServer) handleConnection(conn net.Conn) {
 
 	request, err = s.parseRequest(bufio.NewReader(conn))
 	if err != nil {
-		response = s.http400BadRequest()
+		response = Http400BadRequest()
 		conn.Write(s.marshalResponse(response))
 		s.Logger.Error("failed to parse request", "error", err, "response", response.StatusCode)
 		return
@@ -139,7 +139,7 @@ func (s *HttpServer) handleConnection(conn net.Conn) {
 	)
 
 	if request.Method != "GET" {
-		response = s.http405MethodNotAllowed()
+		response = Http405MethodNotAllowed()
 		conn.Write(s.marshalResponse(response))
 		s.Logger.Warn("unsupported method", "method", request.Method, "response", response.StatusCode)
 		return
@@ -147,7 +147,7 @@ func (s *HttpServer) handleConnection(conn net.Conn) {
 
 	handler, found := s.Router.Match(request.Path)
 	if !found {
-		response = s.http404NotFound()
+		response = Http404NotFound()
 		conn.Write(s.marshalResponse(response))
 		s.Logger.Warn("no handler found", "path", request.Path, "response", response.StatusCode)
 		return
@@ -160,53 +160,13 @@ func (s *HttpServer) handleConnection(conn net.Conn) {
 
 	response, err = handlerPipeline(request)
 	if err != nil {
-		response = s.http500InternalServerError()
+		response = Http500InternalServerError()
 		conn.Write(s.marshalResponse(response))
 		s.Logger.Error("failed to handle request", "error", err, "response", response.StatusCode)
 		return
 	}
 	conn.Write(s.marshalResponse(response))
 	s.Logger.Info("sent response", "status", response.StatusCode, "text", response.StatusText)
-}
-
-func (s *HttpServer) http400BadRequest() *Response {
-	return &Response{
-		StatusCode: 400,
-		StatusText: "Bad Request",
-		Protocol:   "HTTP/1.1",
-		Headers:    copyHeaders(DefaulResponsetHeaders),
-		Body:       []byte("Bad Request"),
-	}
-}
-
-func (s *HttpServer) http404NotFound() *Response {
-	return &Response{
-		StatusCode: 404,
-		StatusText: "Not Found",
-		Protocol:   "HTTP/1.1",
-		Headers:    copyHeaders(DefaulResponsetHeaders),
-		Body:       []byte("Not Found"),
-	}
-}
-
-func (s *HttpServer) http405MethodNotAllowed() *Response {
-	return &Response{
-		StatusCode: 405,
-		StatusText: "Method Not Allowed",
-		Protocol:   "HTTP/1.1",
-		Headers:    copyHeaders(DefaulResponsetHeaders),
-		Body:       []byte("Method Not Allowed"),
-	}
-}
-
-func (s *HttpServer) http500InternalServerError() *Response {
-	return &Response{
-		StatusCode: 500,
-		StatusText: "Internal Server Error",
-		Protocol:   "HTTP/1.1",
-		Headers:    copyHeaders(DefaulResponsetHeaders),
-		Body:       []byte("Internal Server Error"),
-	}
 }
 
 func (s *HttpServer) parseRequest(reader *bufio.Reader) (*Request, error) {
