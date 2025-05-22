@@ -20,7 +20,7 @@ go build -o tiny-http ./cmd
 Optionally, you can build it in a Docker image:
 
 ```shell
-docker build -t tiny-server:latest .
+docker build -t tiny-http:latest .
 ```
 
 ## How to run
@@ -35,8 +35,8 @@ Or, if you want to use Docker (don't forget build the image first):
 ```shell
 docker run -it --rm \
     -p 8080:8080 \
-    -v <directory-to-server>:/<directory-inside-container> \
-    tiny-http:latest ./tiny-http --directory <directory-inside-container>
+    -v <directory-to-server>:/files \
+    tiny-http:latest
 ```
 
 ---
