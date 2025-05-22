@@ -13,12 +13,13 @@ RUN go build -o tiny-http ./cmd
 
 FROM alpine:latest
 
+RUN mkdir -p /files
+COPY ./static/index.html /files/
+
 WORKDIR /app
 
 COPY --from=builder /app/tiny-http .
 
-# Expose the default port
 EXPOSE 8080
 
-# Command to run the server
-CMD ["./tiny-http"]
+CMD ["./tiny-http", "-directory", "/files"]
