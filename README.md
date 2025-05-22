@@ -33,10 +33,7 @@ To learn how to start it run:
 Or, if you want to use Docker (don't forget build the image first):
 
 ```shell
-docker run -it --rm \
-    -p 8080:8080 \
-    -v <directory-to-server>:/files \
-    tiny-http:latest
+docker run -it --rm -p 8080:8080 tiny-http:latest
 ```
 
 ---
